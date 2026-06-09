@@ -1,0 +1,282 @@
+=============================================================
+  OLIST POWER BI DASHBOARD - DAX MEASURES
+  Project: Olist Brazilian E-commerce Analytics
+  Tool: Power BI Desktop
+=============================================================
+
+-------------------------------------------------------------
+ SALES MEASURES
+-------------------------------------------------------------
+
+Total Sales
+Purpose: Calculates the total revenue from all order items
+Formula:
+Total Sales = SUM(olist_order_items_dataset[price])
+
+----
+
+Total Payment Value
+Purpose: Sum of actual payment values made by customers
+Formula:
+Total Payment Value = SUM(olist_order_payments_dataset[payment_value])
+
+----
+
+Avg Order Value
+Purpose: Average revenue generated per order
+Formula:
+Avg Order Value = DIVIDE([Total Sales], [Total No Orders])
+
+----
+
+Sales YTD
+Purpose: Cumulative sales from the start of the year to current date (Year-To-Date)
+Formula:
+Sales YTD = TOTALYTD([Total Sales], DateTable[Date])
+
+----
+
+Sales vs Last Year
+Purpose: Compares current sales to the same period in the previous year
+Formula:
+Sales vs Last Year = CALCULATE([Total Sales], SAMEPERIODLASTYEAR(DateTable[Date]))
+
+----
+
+Sales Growth %
+Purpose: Measures the percentage growth in sales compared to last year
+Formula:
+Sales Growth % = 
+DIVIDE(
+    [Total Sales] - [Sales vs Last Year],
+    [Sales vs Last Year]
+)
+
+-------------------------------------------------------------
+ ORDER MEASURES
+-------------------------------------------------------------
+
+Total No Orders
+Purpose: Counts the total number of unique orders placed
+Formula:
+Total No Orders = DISTINCTCOUNT(olist_order_items_dataset[order_id])
+
+-------------------------------------------------------------
+ CUSTOMER MEASURES
+-------------------------------------------------------------
+
+Total Customers
+Purpose: Counts total unique customers
+Formula:
+Total Customers = DISTINCTCOUNT(olist_customers_dataset[customer_unique_id])
+
+----
+
+Repeat Customers
+Purpose: Counts customers who placed more than one order
+Formula:
+Repeat Customers = [Repeat Customers]
+
+----
+
+New Customers
+Purpose: Customers who placed their first order (Total - Repeat)
+Formula:
+New Customers = [Total Customers] - [Repeat Customers]
+
+----
+
+New Customers Count
+Purpose: Display count of new customers
+Formula:
+New Customers Count = [New Customers]
+
+----
+
+Repeat Customers Count
+Purpose: Display count of repeat customers
+Formula:
+Repeat Customers Count = [Repeat Customers]
+
+----
+
+Customer LTV (Lifetime Value)
+Purpose: Average total sales generated per unique customer
+Formula:
+Customer LTV = 
+AVERAGEX(
+    VALUES(olist_customers_dataset[customer_unique_id]),
+    CALCULATE([Total Sales])
+)
+
+-------------------------------------------------------------
+ DELIVERY & OPERATIONS MEASURES
+-------------------------------------------------------------
+
+Avg Delivery Days
+Purpose: Average number of days taken to deliver an order to the customer
+Formula:
+Avg Delivery Days = 
+AVERAGEX(
+    olist_orders_dataset,
+    DATEDIFF(
+        olist_orders_dataset[order_purchase_timestamp],
+        olist_orders_dataset[order_delivered_customer_date],
+        DAY
+    )
+)
+
+----
+
+Avg Delivery by Month
+Purpose: Average delivery days broken down by month (for trend analysis)
+Formula:
+Avg Delivery by Month = 
+AVERAGEX(
+    VALUES(DateTable[Month]),
+    CALCULATE([Avg Delivery Days])
+)
+
+----
+
+Avg Delivery by State
+Purpose: Average delivery days per customer state (identifies slow regions)
+Formula:
+Avg Delivery by State = 
+AVERAGEX(
+    VALUES(olist_customers_dataset[customer_state]),
+    [Avg Delivery Days]
+)
+
+----
+
+Late Orders
+Purpose: Counts orders delivered after the estimated delivery date
+Formula:
+Late Orders = 
+CALCULATE(
+    [Total Orders],
+    olist_orders_dataset[order_delivered_customer_date] > olist_orders_dataset[order_estimated_delivery_date]
+)
+
+----
+
+Avg Shipping Cost
+Purpose: Average freight/shipping cost per order item
+Formula:
+Avg Shipping Cost = AVERAGE(olist_order_items_dataset[freight_value])
+
+-------------------------------------------------------------
+ REVIEW MEASURES
+-------------------------------------------------------------
+
+Avg Review Score
+Purpose: Average customer satisfaction rating (1-5 scale)
+Formula:
+Avg Review Score = AVERAGE(olist_order_reviews_dataset[review_score])
+
+----
+
+Avg Review by Month
+Purpose: Tracks how customer satisfaction changes month by month
+Formula:
+Avg Review by Month = 
+AVERAGEX(
+    VALUES(DateTable[Month]),
+    CALCULATE([Avg Review Score])
+)
+
+-------------------------------------------------------------
+ DATE TABLE
+-------------------------------------------------------------
+
+DateTable
+Purpose: Custom calendar table used for all time intelligence calculations
+Formula:
+DateTable = 
+CALENDAR(
+    MIN(olist_orders_dataset[order_purchase_timestamp]),
+    MAX(olist_orders_dataset[order_purchase_timestamp])
+)
+
+=============================================================
+  TOTAL MEASURES: 20
+  All measures support interactive filtering via slicers
+=============================================================
+
+
+=============================================================
+  ADDITIONAL MEASURES
+=============================================================
+
+-------------------------------------------------------------
+ ORDER MEASURES (ADDITIONAL)
+-------------------------------------------------------------
+
+Order Volume
+Purpose: Total number of rows/orders in the orders dataset
+Formula:
+Order Volume = COUNTROWS(olist_orders_dataset)
+
+----
+
+Orders by Month
+Purpose: Counts orders per month using the inactive date relationship
+Formula:
+Orders by Month = 
+CALCULATE(
+    COUNTROWS(olist_orders_dataset),
+    USERELATIONSHIP(olist_orders_dataset[order_purchase_timestamp], DateTable[Date])
+)
+
+----
+
+Total Orders
+Purpose: Counts total unique orders using order_id
+Formula:
+Total Orders = DISTINCTCOUNT(olist_orders_dataset[order_id])
+
+-------------------------------------------------------------
+ DELIVERY MEASURES (ADDITIONAL)
+-------------------------------------------------------------
+
+On Time Delivery %
+Purpose: Percentage of orders delivered on or before the estimated delivery date
+Formula:
+On Time Delivery % = 
+VAR LateOrders = 
+    CALCULATE(
+        [Total Orders],
+        olist_orders_dataset[order_delivered_customer_date] > olist_orders_dataset[order_estimated_delivery_date]
+    )
+RETURN
+    1 - DIVIDE(LateOrders, [Total Orders])
+
+-------------------------------------------------------------
+ CUSTOMER MEASURES (ADDITIONAL)
+-------------------------------------------------------------
+
+Repeat Customers
+Purpose: Counts customers who have placed more than one order
+Formula:
+Repeat Customers = 
+VAR CustomersWithOrders = 
+    ADDCOLUMNS(
+        VALUES(olist_customers_dataset[customer_unique_id]),
+        "OrderCount", CALCULATE(DISTINCTCOUNT(olist_orders_dataset[order_id]))
+    )
+RETURN
+COUNTROWS(
+    FILTER(CustomersWithOrders, [OrderCount] > 1)
+)
+
+----
+
+Repeat Rate %
+Purpose: Percentage of total customers who are repeat buyers
+Formula:
+Repeat Rate % = DIVIDE([Repeat Customers], [Total Customers], 0)
+
+=============================================================
+  TOTAL MEASURES: 26
+=============================================================
